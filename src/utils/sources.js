@@ -77,13 +77,6 @@ export const BUILTIN_SOURCES = [
     kind: 'language',
     url: `${BASE}/languages/eng.m3u`,
   },
-  {
-    id: 'airtel',
-    name: 'Airtel IPTV',
-    description: 'Airtel IPTV channels provided by samadhanraut',
-    kind: 'category',
-    url: 'https://raw.githubusercontent.com/samadhanraut/Airtel_IPTV/main/Airtel.m3u',
-  },
 ];
 
 export function findSource(sourceId) {

@@ -51,7 +51,7 @@ function App() {
   const totalCategoryItems = categories.length + 2; // All + Favorites + each category
   const [, moveCategoryFocus] = useGridNavigation(totalCategoryItems, 1);
 
-  // Load built-in sources from the backend once on mount.
+  // Load built-in sources (static catalog, no network call needed).
   useEffect(() => {
     fetchSources()
       .then(setBuiltinSources)
