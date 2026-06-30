@@ -87,6 +87,13 @@ BUILTIN_SOURCES: list[SourceDef] = [
         kind="language",
         url=f"{_BASE}/languages/eng.m3u",
     ),
+    SourceDef(
+        id="airtel",
+        name="Airtel IPTV",
+        description="Airtel IPTV channels provided by samadhanraut",
+        kind="category",
+        url="https://raw.githubusercontent.com/samadhanraut/Airtel_IPTV/main/Airtel.m3u",
+    ),
 ]
 
 
