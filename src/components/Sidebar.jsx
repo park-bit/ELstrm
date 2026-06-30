@@ -10,7 +10,6 @@ export default function Sidebar({
   const menuItems = [
     { id: 'search', icon: '🔍', label: 'Search' },
     { id: 'channels', icon: '🏠', label: 'Home' },
-    { id: 'sources', icon: '📺', label: 'Sources' },
     { id: 'settings', icon: '⚙️', label: 'Settings' }
   ];
 

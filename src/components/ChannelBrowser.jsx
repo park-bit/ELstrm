@@ -34,10 +34,6 @@ export default function ChannelBrowser({
   return (
     <div className="channel-browser">
       <aside className="category-sidebar">
-        <button type="button" className="back-link" onClick={onBack}>
-          ← Sources
-        </button>
-
         <div className="search-wrap">
           <input
             type="search"

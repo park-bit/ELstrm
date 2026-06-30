@@ -2,28 +2,21 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import Sidebar from './components/Sidebar';
 import SettingsView from './components/SettingsView';
 import ChannelBrowser from './components/ChannelBrowser';
-import SourcePicker from './components/SourcePicker';
 import PlayerView from './components/PlayerView';
 import { useGridNavigation } from './hooks/useGridNavigation';
-import { fetchSources, fetchPlaylist, ApiError } from './utils/api';
+import { fetchUnifiedPlaylist, ApiError } from './utils/api';
 import { ALL_CATEGORY, getVisibleChannels } from './utils/channelFilters';
 import {
   getCustomSources,
-  addCustomSource,
-  removeCustomSource,
   getLastWatched,
   setLastWatched,
-  setLastSource,
 } from './utils/storage';
 
 const CHANNEL_GRID_COLUMNS = 4;
 
 function App() {
-  const [view, setView] = useState('sources'); // 'sources' | 'channels' | 'player'
-  const [builtinSources, setBuiltinSources] = useState([]);
+  const [view, setView] = useState('loading'); // 'loading' | 'channels' | 'player' | 'settings'
   const [customSources, setCustomSources] = useState(() => getCustomSources());
-  const [activeSourceContext, setActiveSourceContext] = useState(null); // {id, name}
-  const [loadingSourceId, setLoadingSourceId] = useState(null);
   const [sourceError, setSourceError] = useState('');
 
   const [channels, setChannels] = useState([]);
@@ -54,67 +47,24 @@ function App() {
   const totalCategoryItems = categories.length + 2; // All + Favorites + each category
   const [, moveCategoryFocus] = useGridNavigation(totalCategoryItems, 1);
 
-  // Load built-in sources (static catalog, no network call needed).
   useEffect(() => {
-    fetchSources()
-      .then((sources) => {
-        setBuiltinSources(sources);
-        const last = getLastSource();
-        if (!last) {
-          // Default to India
-          const india = sources.find((s) => s.id === 'in');
-          if (india) {
-            loadSource(india);
-          }
-        }
-      })
-      .catch((err) => {
+    async function loadUnified() {
+      try {
+        const data = await fetchUnifiedPlaylist(customSources);
+        setChannels(data.channels);
+        setCategories(data.categories);
+        setView('channels');
+        setFocusArea('categories');
+        setCategoryFocusIndex(0);
+        setChannelFocusIndex(0);
+      } catch (err) {
         setSourceError(
-          err instanceof ApiError
-            ? err.message
-            : 'Could not load the source list.'
+          err instanceof ApiError ? err.message : 'Failed to load unified playlist'
         );
-      });
-  }, []);
-
-  const loadSource = useCallback(async (source) => {
-    setLoadingSourceId(source.id);
-    setSourceError('');
-    try {
-      const isCustom = source.custom || source.kind === 'custom';
-      const data = await fetchPlaylist(
-        isCustom ? { customUrl: source.url } : { sourceId: source.id }
-      );
-      setChannels(data.channels);
-      setCategories(data.categories);
-      setSelectedCategory(ALL_CATEGORY);
-      setSearchTerm('');
-      setActiveSourceContext({ id: source.id, name: source.name, url: source.url, custom: isCustom });
-      setLastSource({ id: source.id, name: source.name, url: source.url, custom: isCustom });
-      setView('channels');
-      setFocusArea('categories');
-      setCategoryFocusIndex(0);
-      setChannelFocusIndex(0);
-    } catch (err) {
-      setSourceError(
-        err instanceof ApiError
-          ? err.message
-          : 'Something went wrong loading that playlist.'
-      );
-    } finally {
-      setLoadingSourceId(null);
+      }
     }
-  }, [setChannelFocusIndex]);
-
-  function handleAddCustomSource({ name, url }) {
-    const next = addCustomSource({ name, url });
-    setCustomSources(next);
-  }
-
-  function handleRemoveCustomSource(id) {
-    const next = removeCustomSource(id);
-    setCustomSources(next);
-  }
+    loadUnified();
+  }, [customSources, setChannelFocusIndex]);
 
   function handleSelectCategory(category, index) {
     setSelectedCategory(category);
@@ -125,7 +75,7 @@ function App() {
 
   function openChannel(channel) {
     setActiveChannel(channel);
-    setLastWatched(channel, activeSourceContext);
+    setLastWatched(channel, null);
     setContinueWatching(getLastWatched());
     setView('player');
   }
@@ -137,15 +87,7 @@ function App() {
 
   async function handleResumeLastWatched() {
     if (!continueWatching) return;
-    const { channel, sourceContext } = continueWatching;
-    const alreadyLoaded =
-      activeSourceContext &&
-      sourceContext &&
-      activeSourceContext.id === sourceContext.id &&
-      activeSourceContext.url === sourceContext.url;
-    if (sourceContext && !alreadyLoaded) {
-      await loadSource(sourceContext);
-    }
+    const { channel } = continueWatching;
     openChannel(channel);
   }
 
@@ -181,7 +123,7 @@ function App() {
             setFocusArea('sidebar');
           }
           if (e.key === 'Backspace' || e.key === 'Escape') {
-            setView('sources');
+            // no longer switch to 'sources', maybe just exit or do nothing
           }
         } else if (focusArea === 'channels') {
           if (['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(e.key)) {
@@ -243,24 +185,13 @@ function App() {
       />
 
       <main className="main-content">
-        {view === 'sources' && (
-          <>
-            {continueWatching && (
-              <ContinueWatchingBanner
-                channel={continueWatching.channel}
-                onResume={handleResumeLastWatched}
-              />
-            )}
-            <SourcePicker
-              sources={builtinSources}
-              customSources={customSources}
-              onSelect={loadSource}
-              onAddCustom={handleAddCustomSource}
-              onRemoveCustom={handleRemoveCustomSource}
-              loadingSourceId={loadingSourceId}
-              errorMessage={sourceError}
-            />
-          </>
+        {view === 'loading' && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '20px' }}>
+            <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(255,255,255,0.1)', borderTopColor: 'var(--accent-strong)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+            <h2>Loading Channels...</h2>
+            {sourceError && <p className="banner banner-error">{sourceError}</p>}
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          </div>
         )}
 
         {view === 'channels' && (

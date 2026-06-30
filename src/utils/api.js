@@ -1,6 +1,6 @@
 import { CapacitorHttp, Capacitor } from '@capacitor/core';
 import { BUILTIN_SOURCES, findSource } from './sources';
-import { parseAndGroup } from './m3uParser';
+import { parseAndGroup, parseM3U, groupWithFallbacks } from './m3uParser';
 import { TTLCache } from './ttlCache';
 
 // Everything here runs on-device. There is no backend: on native
@@ -71,38 +71,43 @@ export async function fetchSources() {
   return BUILTIN_SOURCES;
 }
 
-export async function fetchPlaylist({ sourceId, customUrl }) {
-  if (!sourceId && !customUrl) {
-    throw new ApiError("Provide either a built-in source or a custom URL", 400);
-  }
-
-  let targetUrl;
-  let cacheKey;
-  let defaultGroup;
-
-  if (sourceId) {
-    const src = findSource(sourceId);
-    if (!src) throw new ApiError(`Unknown source id '${sourceId}'`, 404);
-    targetUrl = src.url;
-    cacheKey = `source:${sourceId}`;
-    defaultGroup = src.name;
-  } else {
-    targetUrl = customUrl;
-    cacheKey = `url:${customUrl}`;
-    defaultGroup = '';
-  }
-
+export async function fetchUnifiedPlaylist(customSources = []) {
+  const cacheKey = 'unified-playlist';
   const cached = playlistCache.get(cacheKey);
   if (cached) return cached;
 
-  const text = await fetchText(targetUrl);
-  const { channels, categories, total } = parseAndGroup(text, defaultGroup);
+  const allSources = [...BUILTIN_SOURCES, ...customSources];
+  
+  const promises = allSources.map(async (src) => {
+    try {
+      const text = await fetchText(src.url);
+      return { text, defaultGroup: src.name };
+    } catch (err) {
+      console.warn(`Failed to fetch source ${src.name}:`, err);
+      throw err;
+    }
+  });
 
-  if (total === 0) {
-    throw new ApiError('No channels could be parsed from this playlist', 422);
+  const results = await Promise.allSettled(promises);
+  
+  let allRaw = [];
+  for (const result of results) {
+    if (result.status === 'fulfilled') {
+      const { text, defaultGroup } = result.value;
+      allRaw.push(...parseM3U(text, defaultGroup));
+    }
   }
 
-  const payload = { status: 'success', total, categories, channels };
+  if (allRaw.length === 0) {
+    throw new ApiError('No channels could be parsed from any source', 422);
+  }
+
+  const grouped = groupWithFallbacks(allRaw);
+  const categories = Array.from(
+    new Set(grouped.map((g) => g.group || 'Uncategorized'))
+  ).sort();
+  
+  const payload = { status: 'success', total: grouped.length, categories, channels: grouped };
   playlistCache.set(cacheKey, payload);
   return payload;
 }
