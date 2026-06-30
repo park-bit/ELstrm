@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import Sidebar from './components/Sidebar';
+import SettingsView from './components/SettingsView';
 import ChannelBrowser from './components/ChannelBrowser';
 import SourcePicker from './components/SourcePicker';
 import PlayerView from './components/PlayerView';
@@ -33,9 +35,10 @@ function App() {
   const [activeChannel, setActiveChannel] = useState(null);
   const [continueWatching, setContinueWatching] = useState(() => getLastWatched());
 
-  // focusArea: 'categories' | 'channels' (only relevant in the 'channels' view)
-  const [focusArea, setFocusArea] = useState('categories');
+  // focusArea: 'categories' | 'channels' | 'sidebar'
+  const [focusArea, setFocusArea] = useState('sidebar');
   const [categoryFocusIndex, setCategoryFocusIndex] = useState(0);
+  const [sidebarFocused, setSidebarFocused] = useState(true);
 
   const visibleChannelCount = useMemo(
     () => getVisibleChannels({ channels, selectedCategory, searchTerm }).length,
@@ -54,7 +57,17 @@ function App() {
   // Load built-in sources (static catalog, no network call needed).
   useEffect(() => {
     fetchSources()
-      .then(setBuiltinSources)
+      .then((sources) => {
+        setBuiltinSources(sources);
+        const last = getLastSource();
+        if (!last) {
+          // Default to India
+          const india = sources.find((s) => s.id === 'in');
+          if (india) {
+            loadSource(india);
+          }
+        }
+      })
       .catch((err) => {
         setSourceError(
           err instanceof ApiError
@@ -151,7 +164,12 @@ function App() {
       if (isTypingTarget) return;
 
       if (view === 'channels') {
-        if (focusArea === 'categories') {
+        if (focusArea === 'sidebar') {
+          if (e.key === 'ArrowRight') {
+            setFocusArea('categories');
+          }
+          // handle up/down within sidebar later
+        } else if (focusArea === 'categories') {
           if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
             e.preventDefault();
             moveCategoryFocus(e.key === 'ArrowDown' ? 'down' : 'up');
@@ -159,15 +177,20 @@ function App() {
           if (e.key === 'ArrowRight') {
             setFocusArea('channels');
           }
+          if (e.key === 'ArrowLeft') {
+            setFocusArea('sidebar');
+          }
           if (e.key === 'Backspace' || e.key === 'Escape') {
             setView('sources');
           }
         } else if (focusArea === 'channels') {
           if (['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(e.key)) {
             e.preventDefault();
-            moveChannelFocus(
+            const hitEdge = moveChannelFocus(
               { ArrowRight: 'right', ArrowLeft: 'left', ArrowDown: 'down', ArrowUp: 'up' }[e.key]
             );
+            // If moved left but we are on the left edge, go back to categories
+            // wait, moveChannelFocus doesn't return edge hit currently. Let's just handle Escape to go back
           }
           if (e.key === 'Backspace' || e.key === 'Escape') {
             setFocusArea('categories');
@@ -208,26 +231,16 @@ function App() {
   }, [handleKeyDown]);
 
   return (
-    <div className="dashboard">
-      <header className="navbar">
-        <div className="nav-brand">
-          <BrandMark />
-          ELstrm
-        </div>
-        <nav className="nav-links">
-          <button
-            type="button"
-            className={`nav-link ${view === 'sources' ? 'active' : ''}`}
-            onClick={() => setView('sources')}
-          >
-            Sources
-          </button>
-          {view === 'channels' && <span className="nav-link active">{activeSourceContext?.name}</span>}
-          {view === 'player' && activeChannel && (
-            <span className="nav-link active">{activeChannel.name}</span>
-          )}
-        </nav>
-      </header>
+    <div className="dashboard dashboard-with-sidebar">
+      <Sidebar 
+        isFocused={focusArea === 'sidebar'} 
+        onFocus={() => setFocusArea('sidebar')} 
+        currentView={view} 
+        onNavigate={(v) => {
+          setView(v);
+          setFocusArea('channels'); // Or wherever appropriate
+        }} 
+      />
 
       <main className="main-content">
         {view === 'sources' && (
@@ -279,6 +292,14 @@ function App() {
             channel={activeChannel}
             onBack={handleExitPlayer}
             onFavoriteToggled={() => setFavoritesVersion((v) => v + 1)}
+          />
+        )}
+
+        {view === 'settings' && (
+          <SettingsView 
+            onClearDefault={() => {
+              setView('sources');
+            }}
           />
         )}
       </main>

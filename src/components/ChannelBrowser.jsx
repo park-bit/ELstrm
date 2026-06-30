@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import ChannelLogo from './ChannelLogo';
+import HeroBanner from './HeroBanner';
 import { isFavorite } from '../utils/storage';
 import { ALL_CATEGORY, FAVORITES_CATEGORY, getVisibleChannels } from '../utils/channelFilters';
 
@@ -26,9 +27,13 @@ export default function ChannelBrowser({
     [channels, selectedCategory, searchTerm, favoritesVersion]
   );
 
+  const featuredChannel = useMemo(() => {
+    return channels.length > 0 ? channels[0] : null;
+  }, [channels]);
+
   return (
     <div className="channel-browser">
-      <aside className="sidebar">
+      <aside className="category-sidebar">
         <button type="button" className="back-link" onClick={onBack}>
           ← Sources
         </button>
@@ -75,6 +80,9 @@ export default function ChannelBrowser({
       </aside>
 
       <main className="channel-grid-container">
+        {selectedCategory === ALL_CATEGORY && !searchTerm && (
+          <HeroBanner featuredChannel={featuredChannel} onPlay={(c) => onPickChannel(c, 0)} />
+        )}
         <h2 className="page-title channel-grid-heading">
           {selectedCategory === ALL_CATEGORY
             ? 'All channels'

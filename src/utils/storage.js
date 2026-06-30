@@ -91,3 +91,7 @@ export function getLastSource() {
 export function setLastSource(sourceContext) {
   safeSet(KEYS.LAST_SOURCE, sourceContext);
 }
+
+export function removeLastSource() {
+  localStorage.removeItem(KEYS.LAST_SOURCE);
+}
