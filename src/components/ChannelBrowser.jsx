@@ -17,6 +17,7 @@ export default function ChannelBrowser({
   searchTerm,
   onSearchChange,
   favoritesVersion, // bump to force re-evaluating isFavorite()
+  errorMessage,
   onBack,
 }) {
   const filteredChannels = useMemo(
@@ -89,10 +90,22 @@ export default function ChannelBrowser({
         </h2>
 
         {filteredChannels.length === 0 ? (
-          <EmptyState
-            isSearch={Boolean(searchTerm.trim())}
-            isFavorites={selectedCategory === FAVORITES_CATEGORY}
-          />
+          <div className="empty-state">
+            {errorMessage ? (
+              <>
+                <p style={{ color: 'var(--accent-strong)' }}>Uh oh, something went wrong:</p>
+                <p>{errorMessage}</p>
+                <p style={{ fontSize: '0.9rem', color: '#999', marginTop: '10px' }}>
+                  If you are on Android, please build a new APK since we just enabled CapacitorHttp.
+                </p>
+              </>
+            ) : (
+              <EmptyState
+                isSearch={Boolean(searchTerm.trim())}
+                isFavorites={selectedCategory === FAVORITES_CATEGORY}
+              />
+            )}
+          </div>
         ) : (
           <div className="channel-grid">
             {filteredChannels.map((channel, index) => (

@@ -214,7 +214,7 @@ function App() {
             searchTerm={searchTerm}
             onSearchChange={setSearchTerm}
             favoritesVersion={favoritesVersion}
-            onBack={() => setView('sources')}
+            errorMessage={sourceError}
           />
         )}
 
